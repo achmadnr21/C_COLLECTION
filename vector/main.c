@@ -31,6 +31,11 @@ int main() {
     vec.pop_back(&vec);
 
     vec.print_all(&vec);
+
+    int get_idx = 5000;
+    orientation_t item = *((orientation_t*) vec.get_at(&vec, get_idx));
+
+    printf("Item at index %d: { pitch: %.3f, roll: %.3f, azimuth: %.3f }\n", get_idx, item.pitch, item.roll, item.azimuth);
     vec.destroy(&vec);
     return 0;
 }
