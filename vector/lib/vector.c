@@ -1,12 +1,20 @@
 #include "vector.h"
 
-void to_string_cleanup(void* data){
+// =============================== PROTOTYPES ===============================
+// Helper
+static inline void to_string_cleanup(void* data);
+// Main Functions
+void VECTOR_push_back(vector_t* self, void* data);
+void VECTOR_pop_back(vector_t* self);
+void VECTOR_print_all (vector_t* self);
+void VECTOR_destroy(vector_t* self);
+void* VECTOR_get_at(vector_t* self, uint64_t index);
+
+
+// =============================== IMPLEMENTATIONS ===============================
+static inline void to_string_cleanup(void* data){
     free(data);
 }
-
-
-
-
 void VECTOR_push_back(vector_t* self, void* data){
     if (self->_size * self->_growth_factor >= self->_allocated_size) {
         // Double the allocated size for safe growth
