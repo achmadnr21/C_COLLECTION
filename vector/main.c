@@ -37,5 +37,6 @@ int main() {
 
     printf("Item at index %d: { pitch: %.3f, roll: %.3f, azimuth: %.3f }\n", get_idx, item.pitch, item.roll, item.azimuth);
     vec.destroy(&vec);
+
     return 0;
 }
