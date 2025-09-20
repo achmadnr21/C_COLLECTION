@@ -27,6 +27,6 @@ typedef struct _pid_controller {
     void (*info)(struct _pid_controller* pid);
 } pid_controller_t;
 
-void PID_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt);
+void PID_CONTROLLER_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt);
 
 #endif

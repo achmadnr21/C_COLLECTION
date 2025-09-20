@@ -2,17 +2,17 @@
 
 
 // ================================= PID CONTROLLER PROTOTYPES ==============================
-void PID_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt);
-float PID_compute_pi(pid_controller_t* pid, float setpoint, float measured_value);
-float PID_compute_pid(pid_controller_t* pid, float setpoint, float measured_value);
-float PID_compute_pd(pid_controller_t* pid, float setpoint, float measured_value);
-void  PID_reset(pid_controller_t* pid);
-void  PID_info(pid_controller_t* pid);
+
+static float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value);
+static float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float measured_value);
+static float PID_CONTROLLER_compute_pd(pid_controller_t* pid, float setpoint, float measured_value);
+static void  PID_CONTROLLER_reset(pid_controller_t* pid);
+static void  PID_CONTROLLER_info(pid_controller_t* pid);
 
 
 // ================================= PID CONTROLLER IMPLEMENTATION ==============================
 
-float PID_compute_pi(pid_controller_t* pid, float setpoint, float measured_value){
+float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     pid->integral += error * pid->dt;
     float output = pid->kp * error + pid->ki * pid->integral;
@@ -24,7 +24,7 @@ float PID_compute_pi(pid_controller_t* pid, float setpoint, float measured_value
     return output;
 }
 
-float PID_compute_pd(pid_controller_t* pid, float setpoint, float measured_value){
+float PID_CONTROLLER_compute_pd(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     float derivative = (error - pid->previous_error) / pid->dt;
     pid->previous_error = error;
@@ -37,7 +37,7 @@ float PID_compute_pd(pid_controller_t* pid, float setpoint, float measured_value
     return output;
 }
 
-float PID_compute_pid(pid_controller_t* pid, float setpoint, float measured_value){
+float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     pid->integral += error * pid->dt;
     float derivative = (error - pid->previous_error) / pid->dt;
@@ -51,13 +51,13 @@ float PID_compute_pid(pid_controller_t* pid, float setpoint, float measured_valu
     return output;
 }
 
-void PID_reset(pid_controller_t* pid){
+void PID_CONTROLLER_reset(pid_controller_t* pid){
     pid->previous_error = 0.0f;
     pid->integral = 0.0f;
 }
 
-void PID_info(pid_controller_t* pid){
-    printf("==========================================\n");
+void PID_CONTROLLER_info(pid_controller_t* pid){
+    printf("===========================================\n");
     printf("PID Controller Info:\n");
     printf("Kp             : %.3f\n", pid->kp);
     printf("Ki             : %.3f\n", pid->ki);
@@ -70,13 +70,13 @@ void PID_info(pid_controller_t* pid){
     I wanna print into the console an information like, the best step to tune the PID controller is 
     starting from the Kp, then Kd, and the last is Ki.  But in pretty format.
     */
-   printf("================== HINTS ==================\n");
-    printf("Tuning Recommendation: Start with Kp, then Kd, and finally Ki.\n");
-    printf("==========================================\n");
+    printf("================== HINTS ==================\n");
+    printf("Tuning Recommendation:\n-> Start with Kp,\n-> then Kd,\n-> and finally Ki.\n");
+    printf("===========================================\n");
 
 }
 
-void PID_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt){
+void PID_CONTROLLER_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt){
     pid->kp = kp;
     pid->ki = ki;
     pid->kd = kd;
@@ -87,10 +87,10 @@ void PID_init(pid_controller_t* pid, float kp, float ki, float kd, float output_
     pid->previous_error = 0.0f;
     pid->integral = 0.0f;
 
-    pid->compute_pi = PID_compute_pi;
-    pid->compute_pd = PID_compute_pd;
-    pid->compute_pid = PID_compute_pid;
-    pid->reset = PID_reset;
-    pid->info = PID_info;
+    pid->compute_pi = PID_CONTROLLER_compute_pi;
+    pid->compute_pd = PID_CONTROLLER_compute_pd;
+    pid->compute_pid = PID_CONTROLLER_compute_pid;
+    pid->reset = PID_CONTROLLER_reset;
+    pid->info = PID_CONTROLLER_info;
 }
 
