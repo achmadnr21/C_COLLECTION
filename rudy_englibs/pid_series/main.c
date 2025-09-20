@@ -6,7 +6,7 @@
 
 #include "lib/pid_controller.h"
 
-#define SIMULATION_SYSTEM_FEEDBACK 0.3f
+#define SIMULATION_SYSTEM_FEEDBACK 1.3f
 #define SIMULATION_TIME 2.0f // seconds
 
 
@@ -33,7 +33,7 @@ int main() {
     int steps = (int)(SIMULATION_TIME / dt)+1;
 
     while(1){
-        system("clear"); // For Linux/Unix, use "cls" for Windows
+        system("clear");
         printf("==========================================\n");
         pid.info(&pid);
         printf("=========> Simulation Start...\n");
@@ -75,7 +75,7 @@ int main() {
             printf("Time: %.1f s, Setpoint: %.2f, Measured: %.2f, Output: %.2f\n", i * pid.dt, setpoint, measured_value, output);
         }
     }
-    
+
     pid.reset(&pid);
 
     
