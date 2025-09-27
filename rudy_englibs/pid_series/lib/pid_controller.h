@@ -1,5 +1,5 @@
-#ifndef PID_H
-#define PID_H
+#ifndef PID_CONTROLLER_H
+#define PID_CONTROLLER_H
 
 #include <stdio.h>
 #include <stdint.h>
