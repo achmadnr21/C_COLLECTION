@@ -91,9 +91,12 @@ static inline float rudy_input_pipeline(
 
 float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self, float input) {
     input += self->offset;
-    if (fabsf(input) < self->deadzone) {
+    float dz = self->deadzone;
+    if (fabsf(input) < dz) {
         return 0.0f;
     }
+    input = (input > 0.0f) ? input - dz : input + dz;
+    input = input / (1.0f - dz);
     if (fabsf(input) > 1.0f) {
         input = (input/fabsf(input)) * 1.0f;
     }
