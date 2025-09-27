@@ -100,5 +100,12 @@ float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self, float 
     if (fabsf(input) > 1.0f) {
         input = (input/fabsf(input)) * 1.0f;
     }
-    return rudy_input_pipeline(input, self->gain, self->k, self->rate);
+    float function_output = rudy_input_pipeline(input, self->gain, self->k, self->rate);
+    // Clamp output to -1.0 to 1.0
+    if (function_output > 1.0f) {
+        function_output = 1.0f;
+    } else if (function_output < -1.0f) {
+        function_output = -1.0f;
+    }
+    return function_output;
 }
