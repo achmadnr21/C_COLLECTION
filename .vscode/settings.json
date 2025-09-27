@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "vector.h": "c",
-        "pid.h": "c",
-        "pid_controller.h": "c"
-    }
-}
