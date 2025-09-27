@@ -90,16 +90,12 @@ static inline float rudy_input_pipeline(
     }
 
 float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self, float input) {
-    // apply offset
     input += self->offset;
-    // apply deadzone
     if (fabsf(input) < self->deadzone) {
         return 0.0f;
     }
-    // jika fabs(input) >= 1.0f, clamp ke 1.0f
     if (fabsf(input) > 1.0f) {
         input = (input/fabsf(input)) * 1.0f;
     }
-    // apply gain, k, rate
     return rudy_input_pipeline(input, self->gain, self->k, self->rate);
 }
