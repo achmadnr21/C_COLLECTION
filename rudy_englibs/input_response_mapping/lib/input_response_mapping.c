@@ -83,9 +83,10 @@ static inline float rudy_input_pipeline(
     float k,
     float r
     ){
-        float g_pow = -(k-0.5);
+        float g_pow = 0.5f-k;
         float x_pow = powf(g, g_pow);
-        float response = powf(x, x_pow)*(x/fabsf(x));
+        float x_fabs = fabsf(x);
+        float response = powf(x_fabs, x_pow)*(x/x_fabs);
         return response * r;
     }
 
@@ -100,6 +101,7 @@ float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self, float 
     if (fabsf(input) > 1.0f) {
         input = (input/fabsf(input)) * 1.0f;
     }
+    
     float function_output = rudy_input_pipeline(input, self->gain, self->k, self->rate);
     // Clamp output to -1.0 to 1.0
     if (function_output > 1.0f) {
