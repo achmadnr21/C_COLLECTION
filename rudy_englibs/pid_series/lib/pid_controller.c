@@ -11,15 +11,20 @@ static void  PID_CONTROLLER_info(pid_controller_t* pid);
 
 
 // ================================= PID CONTROLLER IMPLEMENTATION ==============================
-
+static const float ANTI_WINDUP_FACTOR = 0.1459f;
 float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     pid->integral += error * pid->dt;
     float output = pid->kp * error + pid->ki * pid->integral;
+    float output_unsat = output;
 
     // Clamp output to min/max
     if (output > pid->output_max) output = pid->output_max;
     if (output < pid->output_min) output = pid->output_min;
+
+    float k_aw = ANTI_WINDUP_FACTOR * pid->ki;
+    float aw_correction = (output - output_unsat) * k_aw;
+    pid->integral += (error + aw_correction) * pid->dt;
 
     return output;
 }
@@ -43,10 +48,16 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
     float derivative = (error - pid->previous_error) / pid->dt;
     pid->previous_error = error;
     float output = pid->kp * error + pid->ki * pid->integral + pid->kd * derivative;
-
+    float output_unsat = output;
+    
     // Clamp output to min/max
     if (output > pid->output_max) output = pid->output_max;
     if (output < pid->output_min) output = pid->output_min;
+
+
+    float k_aw = ANTI_WINDUP_FACTOR * pid->ki;
+    float aw_correction = (output - output_unsat) * k_aw;
+    pid->integral += (error + aw_correction) * pid->dt;
 
     return output;
 }
