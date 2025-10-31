@@ -16,9 +16,9 @@ int main() {
     INPUT_RESPONSE_MAPPING_init(&roll, 20.0f, 0.0f, 0.0f, 0.0f, 0.5f);
     roll.set_gain(&roll, 20.0f);
     roll.set_rate(&roll, 0.9f);
-    roll.set_deadzone(&roll, 0.3f);
-    roll.set_offset(&roll, -0.1f);
-    roll.set_k(&roll, 0.28f);
+    roll.set_deadzone(&roll, 0.6f);
+    roll.set_offset(&roll, 0.0f);
+    roll.set_k(&roll, 0.5f);
     roll.info(&roll);
     
     int fd = open("response.csv", O_WRONLY | O_CREAT | O_TRUNC, 0644);
