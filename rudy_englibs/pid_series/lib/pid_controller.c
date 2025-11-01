@@ -11,7 +11,7 @@ static void  PID_CONTROLLER_info(pid_controller_t* pid);
 
 
 // ================================= PID CONTROLLER IMPLEMENTATION ==============================
-static const float ANTI_WINDUP_FACTOR = 0.1459f;
+static const float ANTI_WINDUP_FACTOR = 0.1f;
 float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     pid->integral += error * pid->dt;
