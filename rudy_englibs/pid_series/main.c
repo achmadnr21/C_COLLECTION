@@ -14,8 +14,8 @@ int main() {
     pid_controller_t pid;
 
     float kp = 1.2f;
-    float kd = 0.01f;
-    float ki = 0.1f;
+    float kd = 0.06f;
+    float ki = 0.03f;
 
     float output_min = -10.0f;
     float output_max = 10.0f;

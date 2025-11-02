@@ -17,7 +17,6 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
     float proportional_term = pid->kp * error;
 
     // 2. Integral term
-    pid->integral += error * pid->dt;
     float integral_term = pid->ki * pid->integral;
 
     // 3. Derivative term
@@ -35,12 +34,13 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
     if (output_unsat < pid->output_min) output = pid->output_min;
 
     // Anti-windup: Adjust integral term if output is saturated
-    if(pid->ki_aw!=0.0f 
-        && fabsf(output - output_unsat) > 0.0001f
-     ){
-        float aw_correction = (output - output_unsat) * pid->ki_aw * pid->dt;
-        pid->integral += aw_correction;
+    float integral_increment = error * pid->dt;
+    if (pid->ki_aw != 0.0f && output != output_unsat) {
+        // Back calculation: reduce integral growth during saturation
+        float saturation_error = (output - output_unsat) / pid->ki;
+        integral_increment += saturation_error * pid->ki_aw * pid->dt;
     }
+    pid->integral += integral_increment;
 
     // update previous measurement
     pid->previous_measurement = measured_value;
