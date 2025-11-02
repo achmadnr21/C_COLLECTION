@@ -7,20 +7,23 @@
 #include "lib/pid_controller.h"
 
 #define SIMULATION_SYSTEM_FEEDBACK 1.3f
-#define SIMULATION_TIME 2.0f // seconds
+#define SIMULATION_TIME 3.0f // seconds
 
 
 int main() {
     pid_controller_t pid;
 
-    float kp = 1.6f;
-    float kd = 0.08f;
+    float kp = 1.2f;
+    float kd = 0.01f;
     float ki = 0.1f;
 
     float output_min = -10.0f;
     float output_max = 10.0f;
     float dt = 0.1f; // 100 ms time step
-    PID_CONTROLLER_init(&pid, kp, ki, kd, output_min, output_max, dt);
+
+    float anti_windup_factor = 0.1f; // Anti-windup factor
+    float derivative_filter_coefficient = 10.0f; // Derivative filter coefficient
+    PID_CONTROLLER_init(&pid, kp, ki, kd, output_min, output_max, dt, anti_windup_factor, derivative_filter_coefficient);
     pid.info(&pid);
 
 
@@ -41,7 +44,7 @@ int main() {
             float output = pid.compute_pid(&pid, setpoint, measured_value);
             measured_value += output * SIMULATION_SYSTEM_FEEDBACK;
             // only print every 1 second
-            if (i % 10 == 0) {
+            if (i % 1 == 0) {
                 printf("Time: %.1f s, Setpoint: %.2f, Measured: %.2f, Output: %.2f\n", i * pid.dt, setpoint, measured_value, output);
             }
         }
@@ -64,19 +67,6 @@ int main() {
         
         printf("=========> Simulation End...\nCurrent measured value: %.2f\n", measured_value);
     }
-
-    // Change setpoint to -50
-    setpoint = -20.0f;
-    for(int i = 0; i < steps; i++){
-        float output = pid.compute_pid(&pid, setpoint, measured_value);
-        measured_value += output * SIMULATION_SYSTEM_FEEDBACK;
-        // only print every 1 second
-        if (i % 10 == 0) {
-            printf("Time: %.1f s, Setpoint: %.2f, Measured: %.2f, Output: %.2f\n", i * pid.dt, setpoint, measured_value, output);
-        }
-    }
-
-    pid.reset(&pid);
 
     
     return 0;
