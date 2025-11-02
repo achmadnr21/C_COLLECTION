@@ -11,11 +11,7 @@ static float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self,
 
 
 void INPUT_RESPONSE_MAPPING_init(input_response_mapping_t* self, float gain, float rate, float deadzone, float offset, float k) {
-    self->gain = gain;
-    self->rate = rate;
-    self->deadzone = deadzone;
-    self->offset = offset;
-    self->k = k;
+    
 
     self->set_gain = INPUT_RESPONSE_MAPPING_set_gain;
     self->set_rate = INPUT_RESPONSE_MAPPING_set_rate;
@@ -24,6 +20,12 @@ void INPUT_RESPONSE_MAPPING_init(input_response_mapping_t* self, float gain, flo
     self->set_k = INPUT_RESPONSE_MAPPING_set_k;
     self->info = INPUT_RESPONSE_MAPPING_info;
     self->get_response = INPUT_RESPONSE_MAPPING_get_response;
+
+    self->set_gain(self, gain);
+    self->set_rate(self, rate);
+    self->set_deadzone(self, deadzone);
+    self->set_offset(self, offset);
+    self->set_k(self, k);
 }
 
 void INPUT_RESPONSE_MAPPING_set_gain(input_response_mapping_t* self, float gain) {
@@ -91,7 +93,7 @@ static inline float rudy_input_pipeline(
     }
 
 float INPUT_RESPONSE_MAPPING_get_response(input_response_mapping_t* self, float input) {
-    input += self->offset;
+    input -= self->offset;
     float dz = self->deadzone;
     if (fabsf(input) < dz) {
         return 0.0f;
