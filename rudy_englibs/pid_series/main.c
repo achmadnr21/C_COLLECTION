@@ -6,7 +6,7 @@
 
 #include "lib/pid_controller.h"
 
-#define SIMULATION_SYSTEM_FEEDBACK 0.9f
+#define SIMULATION_SYSTEM_FEEDBACK 1.3f
 #define SIMULATION_TIME 10.0f // seconds
 
 // Function to print simulation header
@@ -56,14 +56,14 @@ int main() {
 
     // PID Parameters - bisa dijadikan user input juga
     float kp = 1.2f;
-    float kd = 0.04f;
-    float ki = 0.03f;
+    float kd = 0.06f;
+    float ki = 0.4f;
 
     float output_min = -10.0f;
     float output_max = 10.0f;
     float dt = 0.1f; // 100 ms time step
 
-    float anti_windup_factor = 0.01f;
+    float anti_windup_factor = 0.001f;
     float derivative_filter_coefficient = 10.0f;
     
     PID_CONTROLLER_init(&pid, kp, ki, kd, output_min, output_max, dt, 
