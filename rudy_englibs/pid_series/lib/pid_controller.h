@@ -15,6 +15,8 @@ typedef struct _pid_controller {
     float ki_aw; // Anti-windup factor
     float kd_N; // Derivative filter coefficient
 
+    float integral_deadband; // Deadband for integral action
+
     float integral;       // Integral of the error (Integrator)
     float previous_measurement; // Previous measurement value
     float filtered_derivative; // Filtered derivative value

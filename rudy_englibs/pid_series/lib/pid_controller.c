@@ -12,18 +12,22 @@ static void  PID_CONTROLLER_info(pid_controller_t* pid);
 
 float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
+    pid->integral += error * pid->dt;
 
     // 1. Proportional term
     float proportional_term = pid->kp * error;
 
-    // 2. Integral term
-    float integral_term = pid->ki * pid->integral;
-
-    // 3. Derivative term
+    // 2. Derivative term
     float derivative_raw = -(measured_value - pid->previous_measurement) / pid->dt;
     float N = pid->kd_N;
     pid->filtered_derivative = (derivative_raw + (N-1)*pid->filtered_derivative) / N;
     float derivative_term = pid->kd * pid->filtered_derivative;
+
+    // 3. Integral term
+    if (fabsf(error) > pid->integral_deadband) {
+        pid->integral += error * pid->dt;
+    }
+    float integral_term = pid->ki * pid->integral;
 
     // PID output before saturation
     float output_unsat = proportional_term + integral_term + derivative_term;
@@ -34,17 +38,10 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
     if (output_unsat < pid->output_min) output = pid->output_min;
 
     // Anti-windup: Adjust integral term if output is saturated
-    float integral_increment = error * pid->dt;
-    if (pid->ki_aw != 0.0f && output != output_unsat) {
-        // Back calculation: reduce integral growth during saturation
+    if (pid->ki_aw > 0.0f && output != output_unsat) {
         float saturation_error = (output - output_unsat) / pid->ki;
-        integral_increment += saturation_error * pid->ki_aw * pid->dt;
+        pid->integral += saturation_error * pid->ki_aw * pid->dt;
     }
-
-    // Update integral only if not saturated or with anti-windup
-    if (output == output_unsat || pid->ki_aw > 0.0f)
-        pid->integral += integral_increment;
-
     // update previous measurement
     pid->previous_measurement = measured_value;
 
@@ -83,13 +80,12 @@ void PID_CONTROLLER_init(pid_controller_t* pid, float kp, float ki, float kd, fl
     pid->output_min = output_min;
     pid->output_max = output_max;
     pid->dt = dt;
-
-    pid->previous_measurement = 0.0f;
-    pid->integral = 0.0f;
-    pid->filtered_derivative = 0.0f;
+    pid->integral_deadband = 0.001f;
 
     pid->compute_pid = PID_CONTROLLER_compute_pid;
     pid->reset = PID_CONTROLLER_reset;
     pid->info = PID_CONTROLLER_info;
+
+    pid->reset(pid);
 }
 
