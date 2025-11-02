@@ -12,14 +12,12 @@ typedef struct _pid_controller {
     float ki; // Integral gain
     float kd; // Derivative gain
 
-    
     float ki_aw; // Anti-windup factor
     float kd_N; // Derivative filter coefficient
 
     float integral;       // Integral of the error (Integrator)
     float previous_measurement; // Previous measurement value
     float filtered_derivative; // Filtered derivative value
-
 
     float output_min; // Minimum output limit
     float output_max; // Maximum output limit

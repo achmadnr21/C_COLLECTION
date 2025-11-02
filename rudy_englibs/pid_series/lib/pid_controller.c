@@ -20,9 +20,9 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
     float integral_term = pid->ki * pid->integral;
 
     // 3. Derivative term
-    float derivative = -(measured_value - pid->previous_measurement) / pid->dt;
+    float derivative_raw = -(measured_value - pid->previous_measurement) / pid->dt;
     float N = pid->kd_N;
-    pid->filtered_derivative = (derivative + (N-1)*pid->filtered_derivative) / N;
+    pid->filtered_derivative = (derivative_raw + (N-1)*pid->filtered_derivative) / N;
     float derivative_term = pid->kd * pid->filtered_derivative;
 
     // PID output before saturation
@@ -40,7 +40,10 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
         float saturation_error = (output - output_unsat) / pid->ki;
         integral_increment += saturation_error * pid->ki_aw * pid->dt;
     }
-    pid->integral += integral_increment;
+
+    // Update integral only if not saturated or with anti-windup
+    if (output == output_unsat || pid->ki_aw > 0.0f)
+        pid->integral += integral_increment;
 
     // update previous measurement
     pid->previous_measurement = measured_value;
@@ -51,6 +54,7 @@ float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float me
 void PID_CONTROLLER_reset(pid_controller_t* pid){
     pid->previous_measurement = 0.0f;
     pid->integral = 0.0f;
+    pid->filtered_derivative = 0.0f;
 }
 
 void PID_CONTROLLER_info(pid_controller_t* pid){
