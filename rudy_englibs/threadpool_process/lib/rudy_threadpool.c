@@ -27,7 +27,7 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
     pthread_cond_init(&queue->cond_not_full, NULL);
     pthread_cond_init(&queue->cond_stop, NULL);
 
-    for(int i = 0; i < capacity; i++) {
+    for(size_t i = 0; i < capacity; i++) {
         queue->tasks[i].state = TASK_STATE_CANCELED;
     }
 
