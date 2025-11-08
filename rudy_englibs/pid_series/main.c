@@ -7,9 +7,8 @@
 #include "lib/pid_controller.h"
 
 #define SIMULATION_SYSTEM_FEEDBACK 1.3f
-#define SIMULATION_TIME 10.0f // seconds
+#define SIMULATION_TIME 20.0f // seconds
 
-// Function to print simulation header
 void print_simulation_header(float setpoint, float initial_measurement) {
     printf("🚀 PID SIMULATION - STEP RESPONSE ANALYSIS\n");
     printf("==========================================\n");
@@ -20,14 +19,12 @@ void print_simulation_header(float setpoint, float initial_measurement) {
     printf("==========================================\n\n");
 }
 
-// Function to print performance metrics
 void print_performance_metrics(float* measurements, int steps, float setpoint, float dt) {
     float steady_state_error = setpoint - measurements[steps-1];
     float overshoot = 0.0f;
     float rise_time = 0.0f;
     float settling_time = 0.0f;
     
-    // Find max overshoot and rise time
     for(int i = 0; i < steps; i++) {
         float current = measurements[i];
         if(current > setpoint && (current - setpoint) > overshoot) {
@@ -63,18 +60,18 @@ int main() {
     float output_max = 10.0f;
     float dt = 0.1f; // 100 ms time step
 
-    float anti_windup_factor = 0.001f;
+    float anti_windup_factor = 0.01f;
     float derivative_filter_coefficient = 10.0f;
     
     PID_CONTROLLER_init(&pid, kp, ki, kd, output_min, output_max, dt, 
                        anti_windup_factor, derivative_filter_coefficient);
 
     // INITIAL STATE
-    float measured_value = 0.0f;
+    float measured_value = 1000.0f;
     float initial_measurement = measured_value;
 
     // SIMULATION LOOP
-    float setpoint = 50.0f;
+    float setpoint = 700.0f;
     int steps = (int)(SIMULATION_TIME / dt) + 1;
     
     // Array untuk menyimpan data performance analysis
@@ -134,6 +131,7 @@ int main() {
         printf("• Enter new setpoint to continue\n");
         printf("• 't' to tune PID parameters\n");  
         printf("• 'r' to reset to default\n");
+        printf("• 's' to set initial measurement and setpoint\n");
         printf("• 'q' to quit\n");
         printf("\n==> Choose option: ");
         
@@ -168,6 +166,22 @@ int main() {
             PID_CONTROLLER_init(&pid, kp, ki, kd, output_min, output_max, dt,
                               anti_windup_factor, derivative_filter_coefficient);
             printf("✅ Reset to default parameters\n");
+            printf("Press Enter to continue...");
+            fgets(input, sizeof(input), stdin);
+        }
+        else if (input[0] == 's' || input[0] == 'S') {
+            // format: <initial_measurement>,<setpoint>
+            printf("Enter initial measurement and setpoint (comma separated): ");
+            if (fgets(input, sizeof(input), stdin)) {
+                float new_initial, new_setpoint;
+                if (sscanf(input, "%f,%f", &new_initial, &new_setpoint) == 2) {
+                    initial_measurement = new_initial;
+                    setpoint = new_setpoint;
+                    printf("✅ Updated initial measurement to %.2f and setpoint to %.2f\n", initial_measurement, setpoint);
+                } else {
+                    printf("❌ Invalid format! Using previous values.\n");
+                }
+            }
             printf("Press Enter to continue...");
             fgets(input, sizeof(input), stdin);
         }
