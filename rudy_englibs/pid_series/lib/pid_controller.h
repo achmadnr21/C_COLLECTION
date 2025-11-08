@@ -16,8 +16,9 @@ typedef struct _pid_controller {
     float kd_N; // Derivative filter coefficient
 
     float integral_deadband; // Deadband for integral action
-
     float integral;       // Integral of the error (Integrator)
+    float integral_max;    // Maximum integral term
+
     float previous_measurement; // Previous measurement value
     float filtered_derivative; // Filtered derivative value
 
