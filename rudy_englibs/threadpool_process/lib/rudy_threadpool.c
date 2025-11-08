@@ -121,6 +121,14 @@ task_t* TASK_dequeue(task_queue_t *queue)
         return NULL; // Return NULL if no task is available
     }
 
+    size_t original_head = queue->head;
+    while(queue->tasks[original_head].state != TASK_STATE_WAITING)
+    {
+        original_head = (original_head + 1) % queue->capacity;
+        printf("Searching for available task...\n");
+    }
+    queue->head = original_head;
+
     task_t* task = &queue->tasks[queue->head]; // Return a pointer to the task
     queue->head = (queue->head + 1) % queue->capacity;
     queue->count--;
