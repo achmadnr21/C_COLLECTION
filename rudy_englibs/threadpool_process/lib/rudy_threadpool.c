@@ -88,7 +88,6 @@ uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
     while (queue->tasks[original_tail].state == TASK_STATE_RUNNING || queue->tasks[original_tail].state == TASK_STATE_WAITING)
     {
         original_tail = (original_tail + 1) % queue->capacity;
-        printf("Searching for empty slot...\n");
     }
     queue->tail = original_tail;
 
@@ -125,7 +124,6 @@ task_t* TASK_dequeue(task_queue_t *queue)
     while(queue->tasks[original_head].state != TASK_STATE_WAITING)
     {
         original_head = (original_head + 1) % queue->capacity;
-        printf("Searching for available task...\n");
     }
     queue->head = original_head;
 
@@ -253,7 +251,7 @@ uint8_t THREADPOOL_destroy(thread_pool_t *pool)
     return 0;
 }
 
-// ================================= THREAD POOL IMPLEMENTATION ==============================
+// ================================= THREAD POOL HELPER ==============================
 char* THREADPOOL_task_state_to_string(struct _thread_pool *pool, task_state_enum_t state)
 {
     switch (state)
