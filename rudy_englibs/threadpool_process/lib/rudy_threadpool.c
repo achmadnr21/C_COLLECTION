@@ -27,6 +27,10 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
     pthread_cond_init(&queue->cond_not_full, NULL);
     pthread_cond_init(&queue->cond_stop, NULL);
 
+    for(int i = 0; i < capacity; i++) {
+        queue->tasks[i].state = TASK_STATE_CANCELED;
+    }
+
     queue->enqueue = TASK_enqueue;
     queue->dequeue = TASK_dequeue;
     queue->purge = TASK_purge;
@@ -79,6 +83,14 @@ uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
     {
         pthread_cond_wait(&queue->cond_not_full, &queue->mutex);
     }
+
+    size_t original_tail = queue->tail;
+    while (queue->tasks[original_tail].state == TASK_STATE_RUNNING || queue->tasks[original_tail].state == TASK_STATE_WAITING)
+    {
+        original_tail = (original_tail + 1) % queue->capacity;
+        printf("Searching for empty slot...\n");
+    }
+    queue->tail = original_tail;
 
     uint64_t task_id = queue->next_id++;
     queue->tasks[queue->tail].id = task_id;
@@ -182,10 +194,14 @@ void *THREADPOOL_worker(void *arg)
         task_t* task = pool->task_queue.dequeue(&pool->task_queue);
         if (!task || !task->func) // Check if task is NULL or invalid
             break;
+        pthread_mutex_lock(&pool->task_queue.mutex);
         task->worker_thread_id = pthread_self();
         task->state = TASK_STATE_RUNNING;
+        pthread_mutex_unlock(&pool->task_queue.mutex);
         task->func(task->arg);
+        pthread_mutex_lock(&pool->task_queue.mutex);
         task->state = TASK_STATE_COMPLETED;
+        pthread_mutex_unlock(&pool->task_queue.mutex);
     }
     return NULL;
 }
