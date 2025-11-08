@@ -44,11 +44,12 @@ typedef struct _task_queue
     pthread_cond_t cond_stop;    // Function pointers for task queue operations
 
     uint64_t (*enqueue)(struct _task_queue *queue, worker_func_t func, void *arg); // Function to add a task
-    task_t (*dequeue)(struct _task_queue *queue);                                  // Function to remove a task
+    task_t* (*dequeue)(struct _task_queue *queue);                                  // Function to remove a task
     uint8_t (*purge)(struct _task_queue *queue);                                   // Function to clear all tasks, we will send that current condition is full until all tasks are done
     uint8_t (*is_empty)(struct _task_queue *queue);                                // Check if the queue is empty
     uint8_t (*is_full)(struct _task_queue *queue);                                 // Check if the queue is full
     uint8_t (*destroy)(struct _task_queue *queue);                                 // Destroy the task queue
+    task_state_enum_t (*get_state)(struct _task_queue *queue, uint64_t task_id);  // Get task state
 } task_queue_t;
 
 typedef struct _thread_pool
@@ -60,6 +61,8 @@ typedef struct _thread_pool
     task_queue_t task_queue; // Task queue
 
     uint64_t (*add_task)(struct _thread_pool *pool, worker_func_t func, void *arg); // Function to add a task
+    task_state_enum_t (*get_task_state)(struct _thread_pool *pool, uint64_t task_id); // Function to get task state
+    char* (*task_state_to_string)(struct _thread_pool *pool, task_state_enum_t state); // Function to convert task state to string
     uint8_t (*destroy)(struct _thread_pool *pool);                                 // Function to destroy the thread pool
 } thread_pool_t;
 

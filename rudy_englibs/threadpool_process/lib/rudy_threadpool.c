@@ -2,11 +2,12 @@
 
 // ================================= THREAD POOL TASK PROTOTYPES ==============================
 static uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg);
-static task_t TASK_dequeue(task_queue_t *queue);
+static task_t* TASK_dequeue(task_queue_t *queue);
 static uint8_t TASK_purge(task_queue_t *queue);
 static uint8_t TASK_is_empty(task_queue_t *queue);
 static uint8_t TASK_is_full(task_queue_t *queue);
 static uint8_t TASK_destroy(task_queue_t *queue);
+static task_state_enum_t TASK_get_state(task_queue_t *queue, uint64_t task_id);
 static void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity);
 // ================================= THREAD POOL TASK IMPLEMENTATION ==============================
 
@@ -32,6 +33,7 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
     queue->is_empty = TASK_is_empty;
     queue->is_full = TASK_is_full;
     queue->destroy = TASK_destroy;
+    queue->get_state = TASK_get_state; // assign state getter
 }
 
 uint8_t TASK_is_empty(task_queue_t *queue)
@@ -93,7 +95,7 @@ uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
     return task_id;
 }
 
-task_t TASK_dequeue(task_queue_t *queue)
+task_t* TASK_dequeue(task_queue_t *queue)
 {
     pthread_mutex_lock(&queue->mutex);
     while (queue->is_empty(queue) && !queue->stop)
@@ -104,10 +106,10 @@ task_t TASK_dequeue(task_queue_t *queue)
     if (queue->stop && queue->is_empty(queue))
     {
         pthread_mutex_unlock(&queue->mutex);
-        return (task_t){0}; // Return an empty task
+        return NULL; // Return NULL if no task is available
     }
 
-    task_t task = queue->tasks[queue->head];
+    task_t* task = &queue->tasks[queue->head]; // Return a pointer to the task
     queue->head = (queue->head + 1) % queue->capacity;
     queue->count--;
 
@@ -130,9 +132,27 @@ uint8_t TASK_purge(task_queue_t *queue)
     return 0;
 }
 
+task_state_enum_t TASK_get_state(task_queue_t *queue, uint64_t task_id)
+{
+    pthread_mutex_lock(&queue->mutex);
+    for (size_t i = 0; i < queue->capacity; i++)
+    {
+        if (queue->tasks[i].id == task_id)
+        {
+            task_state_enum_t state = queue->tasks[i].state;
+            pthread_mutex_unlock(&queue->mutex);
+            return state;
+        }
+    }
+    pthread_mutex_unlock(&queue->mutex);
+    return TASK_STATE_CANCELED; // Return CANCELED if task not found
+}
+
 // ================================= THREAD POOL PROTOTYPES ==============================
 static void *THREADPOOL_worker(void *arg);
 static uint64_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg);
+static task_state_enum_t THREADPOOL_get_task_state(thread_pool_t *pool, uint64_t task_id);
+static char* THREADPOOL_task_state_to_string(struct _thread_pool *pool, task_state_enum_t state);
 static uint8_t THREADPOOL_destroy(thread_pool_t *pool);
 // ================================= THREAD POOL IMPLEMENTATION ==============================
 void THREADPOOL_init(thread_pool_t *pool, size_t thread_size, size_t task_queue_size)
@@ -143,6 +163,8 @@ void THREADPOOL_init(thread_pool_t *pool, size_t thread_size, size_t task_queue_
     // Set public API function pointers
     pool->add_task = THREADPOOL_add_task;
     pool->destroy = THREADPOOL_destroy;
+    pool->get_task_state = THREADPOOL_get_task_state;
+    pool->task_state_to_string = THREADPOOL_task_state_to_string;
 
     for (size_t i = 0; i < thread_size; i++)
     {
@@ -157,13 +179,13 @@ void *THREADPOOL_worker(void *arg)
 
     while (1)
     {
-        task_t task = pool->task_queue.dequeue(&pool->task_queue);
-        if (!task.func)
+        task_t* task = pool->task_queue.dequeue(&pool->task_queue);
+        if (!task || !task->func) // Check if task is NULL or invalid
             break;
-        task.worker_thread_id = pthread_self();
-        task.state = TASK_STATE_RUNNING;
-        task.func(task.arg);
-        task.state = TASK_STATE_COMPLETED;
+        task->worker_thread_id = pthread_self();
+        task->state = TASK_STATE_RUNNING;
+        task->func(task->arg);
+        task->state = TASK_STATE_COMPLETED;
     }
     return NULL;
 }
@@ -174,6 +196,11 @@ uint64_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg)
         return 0;
 
     return pool->task_queue.enqueue(&pool->task_queue, func, arg);
+}
+
+task_state_enum_t THREADPOOL_get_task_state(thread_pool_t *pool, uint64_t task_id)
+{
+    return pool->task_queue.get_state(&pool->task_queue, task_id);
 }
 
 uint8_t THREADPOOL_destroy(thread_pool_t *pool)
@@ -200,4 +227,22 @@ uint8_t THREADPOOL_destroy(thread_pool_t *pool)
     pool->task_queue.destroy(&pool->task_queue);
 
     return 0;
+}
+
+// ================================= THREAD POOL IMPLEMENTATION ==============================
+char* THREADPOOL_task_state_to_string(struct _thread_pool *pool, task_state_enum_t state)
+{
+    switch (state)
+    {
+    case TASK_STATE_WAITING:
+        return "WAITING";
+    case TASK_STATE_RUNNING:
+        return "RUNNING";
+    case TASK_STATE_COMPLETED:
+        return "COMPLETED";
+    case TASK_STATE_CANCELED:
+        return "CANCELED";
+    default:
+        return "UNKNOWN";
+    }
 }
