@@ -82,6 +82,9 @@ uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
     queue->tasks[queue->tail].id = task_id;
     queue->tasks[queue->tail].func = func;
     queue->tasks[queue->tail].arg = arg;
+    queue->tasks[queue->tail].state = TASK_STATE_WAITING;
+    queue->tasks[queue->tail].worker_thread_id = 0;
+
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->count++;
 
@@ -101,7 +104,7 @@ task_t TASK_dequeue(task_queue_t *queue)
     if (queue->stop && queue->is_empty(queue))
     {
         pthread_mutex_unlock(&queue->mutex);
-        return (task_t){0, NULL, NULL};
+        return (task_t){0}; // Return an empty task
     }
 
     task_t task = queue->tasks[queue->head];
@@ -129,7 +132,7 @@ uint8_t TASK_purge(task_queue_t *queue)
 
 // ================================= THREAD POOL PROTOTYPES ==============================
 static void *THREADPOOL_worker(void *arg);
-static uint8_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg);
+static uint64_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg);
 static uint8_t THREADPOOL_destroy(thread_pool_t *pool);
 // ================================= THREAD POOL IMPLEMENTATION ==============================
 void THREADPOOL_init(thread_pool_t *pool, size_t thread_size, size_t task_queue_size)
@@ -157,18 +160,20 @@ void *THREADPOOL_worker(void *arg)
         task_t task = pool->task_queue.dequeue(&pool->task_queue);
         if (!task.func)
             break;
+        task.worker_thread_id = pthread_self();
+        task.state = TASK_STATE_RUNNING;
         task.func(task.arg);
+        task.state = TASK_STATE_COMPLETED;
     }
     return NULL;
 }
 
-uint8_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg)
+uint64_t THREADPOOL_add_task(thread_pool_t *pool, worker_func_t func, void *arg)
 {
     if (!pool->is_running)
-        return 1;
+        return 0;
 
-    pool->task_queue.enqueue(&pool->task_queue, func, arg);
-    return 0;
+    return pool->task_queue.enqueue(&pool->task_queue, func, arg);
 }
 
 uint8_t THREADPOOL_destroy(thread_pool_t *pool)

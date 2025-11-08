@@ -32,7 +32,11 @@ int main() {
 
     // Add tasks to the pool
     for (int i = 0; i < 20; i++) {
-        pool.add_task(&pool, my_task_function, (void *)(intptr_t)i);
+        uint64_t task_id = pool.add_task(&pool, my_task_function, (void *)(intptr_t)i);
+        if (task_id == 0) {
+            fprintf(stderr, "Failed to add task %d\n", i);
+        }
+        printf("Added Task %d with ID %llu\n", i, task_id);
     }
 
     // Destroy the pool

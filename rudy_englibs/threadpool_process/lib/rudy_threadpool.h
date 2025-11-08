@@ -10,11 +10,22 @@
 
 typedef void *(*worker_func_t)(void *);
 
+typedef enum {
+    TASK_STATE_WAITING,
+    TASK_STATE_RUNNING,
+    TASK_STATE_COMPLETED,
+    TASK_STATE_CANCELED
+} task_state_enum_t;
+
 typedef struct _task
 {
     uint64_t id;
     worker_func_t func;
     void *arg;
+
+    pthread_t worker_thread_id;
+    task_state_enum_t state;
+
 } task_t;
 
 typedef struct _task_queue
@@ -48,7 +59,7 @@ typedef struct _thread_pool
 
     task_queue_t task_queue; // Task queue
 
-    uint8_t (*add_task)(struct _thread_pool *pool, worker_func_t func, void *arg); // Function to add a task
+    uint64_t (*add_task)(struct _thread_pool *pool, worker_func_t func, void *arg); // Function to add a task
     uint8_t (*destroy)(struct _thread_pool *pool);                                 // Function to destroy the thread pool
 } thread_pool_t;
 
