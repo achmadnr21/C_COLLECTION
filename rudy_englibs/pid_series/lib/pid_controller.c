@@ -1,70 +1,57 @@
 #include "pid_controller.h"
 
-
+#include <math.h>
 // ================================= PID CONTROLLER PROTOTYPES ==============================
 
-static float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value);
 static float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float measured_value);
-static float PID_CONTROLLER_compute_pd(pid_controller_t* pid, float setpoint, float measured_value);
 static void  PID_CONTROLLER_reset(pid_controller_t* pid);
 static void  PID_CONTROLLER_info(pid_controller_t* pid);
 
 
 // ================================= PID CONTROLLER IMPLEMENTATION ==============================
-static const float ANTI_WINDUP_FACTOR = 0.1f;
-float PID_CONTROLLER_compute_pi(pid_controller_t* pid, float setpoint, float measured_value){
-    float error = setpoint - measured_value;
-    pid->integral += error * pid->dt;
-    float output = pid->kp * error + pid->ki * pid->integral;
-    float output_unsat = output;
-
-    // Clamp output to min/max
-    if (output > pid->output_max) output = pid->output_max;
-    if (output < pid->output_min) output = pid->output_min;
-
-    float k_aw = ANTI_WINDUP_FACTOR * pid->ki;
-    float aw_correction = (output - output_unsat) * k_aw;
-    pid->integral += (error + aw_correction) * pid->dt;
-
-    return output;
-}
-
-float PID_CONTROLLER_compute_pd(pid_controller_t* pid, float setpoint, float measured_value){
-    float error = setpoint - measured_value;
-    float derivative = (error - pid->previous_error) / pid->dt;
-    pid->previous_error = error;
-    float output = pid->kp * error + pid->kd * derivative;
-
-    // Clamp output to min/max
-    if (output > pid->output_max) output = pid->output_max;
-    if (output < pid->output_min) output = pid->output_min;
-
-    return output;
-}
 
 float PID_CONTROLLER_compute_pid(pid_controller_t* pid, float setpoint, float measured_value){
     float error = setpoint - measured_value;
     pid->integral += error * pid->dt;
-    float derivative = (error - pid->previous_error) / pid->dt;
-    pid->previous_error = error;
-    float output = pid->kp * error + pid->ki * pid->integral + pid->kd * derivative;
-    float output_unsat = output;
-    
+
+    // 1. Proportional term
+    float proportional_term = pid->kp * error;
+
+    // 2. Derivative term
+    float derivative_raw = -(measured_value - pid->previous_measurement) / pid->dt;
+    float N = pid->kd_N;
+    pid->filtered_derivative = (derivative_raw + (N-1)*pid->filtered_derivative) / N;
+    float derivative_term = pid->kd * pid->filtered_derivative;
+
+    // 3. Integral term
+    if (fabsf(error) > pid->integral_deadband) {
+        pid->integral += error * pid->dt;
+    }
+    float integral_term = pid->ki * pid->integral;
+
+    // PID output before saturation
+    float output_unsat = proportional_term + integral_term + derivative_term;
+    float output = output_unsat;
+
     // Clamp output to min/max
-    if (output > pid->output_max) output = pid->output_max;
-    if (output < pid->output_min) output = pid->output_min;
+    if (output_unsat > pid->output_max) output = pid->output_max;
+    if (output_unsat < pid->output_min) output = pid->output_min;
 
-
-    float k_aw = ANTI_WINDUP_FACTOR * pid->ki;
-    float aw_correction = (output - output_unsat) * k_aw;
-    pid->integral += (error + aw_correction) * pid->dt;
+    // Anti-windup: Adjust integral term if output is saturated
+    if (pid->ki_aw > 0.0f && output != output_unsat) {
+        float saturation_error = (output - output_unsat) / pid->ki;
+        pid->integral += saturation_error * pid->ki_aw * pid->dt;
+    }
+    // update previous measurement
+    pid->previous_measurement = measured_value;
 
     return output;
 }
 
 void PID_CONTROLLER_reset(pid_controller_t* pid){
-    pid->previous_error = 0.0f;
+    pid->previous_measurement = 0.0f;
     pid->integral = 0.0f;
+    pid->filtered_derivative = 0.0f;
 }
 
 void PID_CONTROLLER_info(pid_controller_t* pid){
@@ -73,35 +60,32 @@ void PID_CONTROLLER_info(pid_controller_t* pid){
     printf("Kp             : %.3f\n", pid->kp);
     printf("Ki             : %.3f\n", pid->ki);
     printf("Kd             : %.3f\n", pid->kd);
-    printf("Output Limits. : (%.3f <= output <= %.3f)\n", pid->output_min, pid->output_max);
+    printf("Output Limits  : (%.3f <= output <= %.3f)\n", pid->output_min, pid->output_max);
     printf("Time Step (dt) : %.3f seconds\n", pid->dt);
-    printf("Previous Error : %.3f\n", pid->previous_error);
-    printf("Integral.      : %.3f\n", pid->integral);
-    /*
-    I wanna print into the console an information like, the best step to tune the PID controller is 
-    starting from the Kp, then Kd, and the last is Ki.  But in pretty format.
-    */
+    printf("Prev Measurement: %.3f\n", pid->previous_measurement); // Ganti ini
+    printf("Integral       : %.3f\n", pid->integral);
+    printf("Anti-windup K  : %.3f\n", pid->ki_aw);
     printf("================== HINTS ==================\n");
-    printf("Tuning Recommendation:\n-> Start with Kp,\n-> then Kd,\n-> and finally Ki.\n");
+    printf("• Using Derivative-on-Measurement (no kick)\n");
+    printf("• Tuning: Start with Kp, then Kd, last Ki\n");
     printf("===========================================\n");
-
 }
 
-void PID_CONTROLLER_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt){
+void PID_CONTROLLER_init(pid_controller_t* pid, float kp, float ki, float kd, float output_min, float output_max, float dt, float anti_windup_factor, float derivative_filter_coefficient){
     pid->kp = kp;
     pid->ki = ki;
     pid->kd = kd;
+    pid->ki_aw = anti_windup_factor * ki;
+    pid->kd_N = derivative_filter_coefficient;
     pid->output_min = output_min;
     pid->output_max = output_max;
     pid->dt = dt;
+    pid->integral_deadband = 0.001f;
 
-    pid->previous_error = 0.0f;
-    pid->integral = 0.0f;
-
-    pid->compute_pi = PID_CONTROLLER_compute_pi;
-    pid->compute_pd = PID_CONTROLLER_compute_pd;
     pid->compute_pid = PID_CONTROLLER_compute_pid;
     pid->reset = PID_CONTROLLER_reset;
     pid->info = PID_CONTROLLER_info;
+
+    pid->reset(pid);
 }
 
