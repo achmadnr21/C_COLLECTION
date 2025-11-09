@@ -11,6 +11,7 @@
 typedef void *(*worker_func_t)(void *);
 
 typedef enum {
+    TASK_STATE_OPEN,
     TASK_STATE_WAITING,
     TASK_STATE_RUNNING,
     TASK_STATE_COMPLETED,
@@ -32,9 +33,6 @@ typedef struct _task_queue
 {
     task_t *tasks;    // Array of tasks
     size_t capacity;  // Maximum number of tasks
-    size_t count;     // Current number of tasks
-    size_t head;      // Index of the task to be processed
-    size_t tail;      // Index of latest added task
     uint64_t next_id; // ID for the next task
     pthread_mutex_t mutex; // Mutex for thread safety
     pthread_cond_t cond_not_empty; // Condition variable for not empty

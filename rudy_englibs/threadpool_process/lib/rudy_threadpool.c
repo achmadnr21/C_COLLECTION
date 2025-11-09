@@ -15,9 +15,6 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
 {
     queue->tasks = (task_t *)malloc(sizeof(task_t) * capacity);
     queue->capacity = capacity;
-    queue->count = 0;
-    queue->head = 0;
-    queue->tail = 0;
     queue->next_id = 1;
 
     queue->stop = 0;
@@ -28,7 +25,7 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
     pthread_cond_init(&queue->cond_stop, NULL);
 
     for(size_t i = 0; i < capacity; i++) {
-        queue->tasks[i].state = TASK_STATE_CANCELED;
+        queue->tasks[i].state = TASK_STATE_OPEN;
     }
 
     queue->enqueue = TASK_enqueue;
@@ -42,12 +39,36 @@ void THREADPOOL_TASK_init(task_queue_t *queue, size_t capacity)
 
 uint8_t TASK_is_empty(task_queue_t *queue)
 {
-    return queue->count == 0;
+    // Check if there are any waiting or running tasks
+    // perform butterfly check
+    size_t half_capacity = queue->capacity / 2;
+    for (size_t i = 0; i < half_capacity; i++) {
+        if (queue->tasks[i].state == TASK_STATE_WAITING || queue->tasks[i].state == TASK_STATE_RUNNING) {
+            return 0;
+        }
+        size_t rev_index = queue->capacity - 1 - i;
+        if (queue->tasks[rev_index].state == TASK_STATE_WAITING || queue->tasks[rev_index].state == TASK_STATE_RUNNING) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 uint8_t TASK_is_full(task_queue_t *queue)
 {
-    return queue->count == queue->capacity;
+    // Count active tasks (waiting + running)
+    size_t active_tasks = 0;
+    size_t half_capacity = queue->capacity / 2;
+    for (size_t i = 0; i < half_capacity; i++) {
+        if (queue->tasks[i].state == TASK_STATE_WAITING || queue->tasks[i].state == TASK_STATE_RUNNING) {
+            active_tasks++;
+        }
+        size_t rev_index = queue->capacity - 1 - i;
+        if (queue->tasks[rev_index].state == TASK_STATE_WAITING || queue->tasks[rev_index].state == TASK_STATE_RUNNING) {
+            active_tasks++;
+        }
+    }
+    return active_tasks >= queue->capacity;
 }
 
 uint8_t TASK_destroy(task_queue_t *queue)
@@ -63,9 +84,6 @@ uint8_t TASK_destroy(task_queue_t *queue)
 
     // Reset other members
     queue->capacity = 0;
-    queue->count = 0;
-    queue->head = 0;
-    queue->tail = 0;
     queue->next_id = 0;
 
     pthread_mutex_unlock(&queue->mutex);
@@ -79,27 +97,38 @@ uint8_t TASK_destroy(task_queue_t *queue)
 uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
 {
     pthread_mutex_lock(&queue->mutex);
-    while (queue->is_full(queue))
-    {
+    
+    size_t active_tasks = 0;
+    for (size_t i = 0; i < queue->capacity; i++) {
+        if (queue->tasks[i].state == TASK_STATE_WAITING || queue->tasks[i].state == TASK_STATE_RUNNING) {
+            active_tasks++;
+        }
+    }
+    
+    while (active_tasks >= queue->capacity) {
         pthread_cond_wait(&queue->cond_not_full, &queue->mutex);
+        active_tasks = 0;
+        for (size_t i = 0; i < queue->capacity; i++) {
+            if (queue->tasks[i].state == TASK_STATE_WAITING || queue->tasks[i].state == TASK_STATE_RUNNING) {
+                active_tasks++;
+            }
+        }
     }
 
-    size_t original_tail = queue->tail;
-    while (queue->tasks[original_tail].state == TASK_STATE_RUNNING || queue->tasks[original_tail].state == TASK_STATE_WAITING)
-    {
-        original_tail = (original_tail + 1) % queue->capacity;
+    size_t slot_index = 0;
+    for (size_t i = 0; i < queue->capacity; i++) {
+        if (queue->tasks[i].state != TASK_STATE_WAITING && queue->tasks[i].state != TASK_STATE_RUNNING) {
+            slot_index = i;
+            break;
+        }
     }
-    queue->tail = original_tail;
 
     uint64_t task_id = queue->next_id++;
-    queue->tasks[queue->tail].id = task_id;
-    queue->tasks[queue->tail].func = func;
-    queue->tasks[queue->tail].arg = arg;
-    queue->tasks[queue->tail].state = TASK_STATE_WAITING;
-    queue->tasks[queue->tail].worker_thread_id = 0;
-
-    queue->tail = (queue->tail + 1) % queue->capacity;
-    queue->count++;
+    queue->tasks[slot_index].id = task_id;
+    queue->tasks[slot_index].func = func;
+    queue->tasks[slot_index].arg = arg;
+    queue->tasks[slot_index].state = TASK_STATE_WAITING;
+    queue->tasks[slot_index].worker_thread_id = 0;
 
     pthread_cond_signal(&queue->cond_not_empty);
     pthread_mutex_unlock(&queue->mutex);
@@ -109,41 +138,29 @@ uint64_t TASK_enqueue(task_queue_t *queue, worker_func_t func, void *arg)
 task_t* TASK_dequeue(task_queue_t *queue)
 {
     pthread_mutex_lock(&queue->mutex);
-    while (queue->is_empty(queue) && !queue->stop)
-    {
+    
+    while (!queue->stop) {
+        // Find a waiting task and immediately mark it as running
+        for (size_t i = 0; i < queue->capacity; i++) {
+            if (queue->tasks[i].state == TASK_STATE_WAITING) {
+                queue->tasks[i].state = TASK_STATE_RUNNING;
+                queue->tasks[i].worker_thread_id = pthread_self();
+                pthread_mutex_unlock(&queue->mutex);
+                return &queue->tasks[i];
+            }
+        }
+        
+        // No waiting tasks found, wait for signal
         pthread_cond_wait(&queue->cond_not_empty, &queue->mutex);
     }
 
-    if (queue->stop && queue->is_empty(queue))
-    {
-        pthread_mutex_unlock(&queue->mutex);
-        return NULL; // Return NULL if no task is available
-    }
-
-    size_t original_head = queue->head;
-    while(queue->tasks[original_head].state != TASK_STATE_WAITING)
-    {
-        original_head = (original_head + 1) % queue->capacity;
-    }
-    queue->head = original_head;
-
-    task_t* task = &queue->tasks[queue->head]; // Return a pointer to the task
-    queue->head = (queue->head + 1) % queue->capacity;
-    queue->count--;
-
-    pthread_cond_signal(&queue->cond_not_full);
     pthread_mutex_unlock(&queue->mutex);
-    return task;
+    return NULL;
 }
 
 uint8_t TASK_purge(task_queue_t *queue)
 {
     pthread_mutex_lock(&queue->mutex);
-
-    queue->head = 0;
-    queue->tail = 0;
-    queue->count = 0;
-
     pthread_cond_broadcast(&queue->cond_not_full);
     pthread_cond_broadcast(&queue->cond_not_empty);
     pthread_mutex_unlock(&queue->mutex);
@@ -163,7 +180,7 @@ task_state_enum_t TASK_get_state(task_queue_t *queue, uint64_t task_id)
         }
     }
     pthread_mutex_unlock(&queue->mutex);
-    return TASK_STATE_CANCELED; // Return CANCELED if task not found
+    return -1; // Return OPEN if task not found
 }
 
 // ================================= THREAD POOL PROTOTYPES ==============================
@@ -175,6 +192,10 @@ static uint8_t THREADPOOL_destroy(thread_pool_t *pool);
 // ================================= THREAD POOL IMPLEMENTATION ==============================
 void THREADPOOL_init(thread_pool_t *pool, size_t thread_size, size_t task_queue_size)
 {
+    // pool capacity should be even 
+    thread_size = (thread_size & 1) ? thread_size + 1 : thread_size;
+    // task queue size should be even
+    task_queue_size = (task_queue_size & 1) ? task_queue_size + 1 : task_queue_size;
     THREADPOOL_TASK_init(&pool->task_queue, task_queue_size);
     pool->threads = (pthread_t *)malloc(sizeof(pthread_t) * thread_size);
     pool->count = thread_size;
@@ -200,13 +221,15 @@ void *THREADPOOL_worker(void *arg)
         task_t* task = pool->task_queue.dequeue(&pool->task_queue);
         if (!task || !task->func) // Check if task is NULL or invalid
             break;
-        pthread_mutex_lock(&pool->task_queue.mutex);
-        task->worker_thread_id = pthread_self();
-        task->state = TASK_STATE_RUNNING;
-        pthread_mutex_unlock(&pool->task_queue.mutex);
+        
+        // Task is already marked as RUNNING and worker_thread_id is set in dequeue
+        // Execute the task function
         task->func(task->arg);
+        
+        // Mark task as completed and signal availability
         pthread_mutex_lock(&pool->task_queue.mutex);
         task->state = TASK_STATE_COMPLETED;
+        pthread_cond_signal(&pool->task_queue.cond_not_full);
         pthread_mutex_unlock(&pool->task_queue.mutex);
     }
     return NULL;
@@ -256,6 +279,8 @@ char* THREADPOOL_task_state_to_string(struct _thread_pool *pool, task_state_enum
 {
     switch (state)
     {
+    case TASK_STATE_OPEN:
+        return "OPEN";
     case TASK_STATE_WAITING:
         return "WAITING";
     case TASK_STATE_RUNNING:
@@ -265,6 +290,6 @@ char* THREADPOOL_task_state_to_string(struct _thread_pool *pool, task_state_enum
     case TASK_STATE_CANCELED:
         return "CANCELED";
     default:
-        return "UNKNOWN";
+        return "ALREADY NOT IN TASK";
     }
 }

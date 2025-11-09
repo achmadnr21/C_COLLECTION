@@ -19,11 +19,9 @@ void* my_task_function(void* arg) {
 int main() {
 
     thread_pool_t pool;
-    THREADPOOL_init(&pool, 5, 40);
+    THREADPOOL_init(&pool, 64, 32);
 
-    // Add tasks to the pool
-    
-    const int total_tasks = 20;
+    const int total_tasks = 128;
     uint64_t task_ids[total_tasks];
     for (int i = 0; i < total_tasks; i++) {
         uint64_t task_id = pool.add_task(&pool, my_task_function, (void *)(intptr_t)i);
@@ -34,7 +32,7 @@ int main() {
         printf("Added Task %d with ID %llu\n", i, task_id);
     }
     // loop checking all task states
-    sleep(3);
+    sleep(4);
     for (int i = 0; i < total_tasks; i++) {
         task_state_enum_t state = pool.get_task_state(&pool, task_ids[i]);
         printf("State of Task ID %llu: %s\n", task_ids[i], pool
